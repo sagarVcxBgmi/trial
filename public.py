@@ -16,7 +16,7 @@ import threading
 logging.basicConfig(level=logging.INFO)
 
 # Constants
-MAX_ATTACK_DURATION = 240
+MAX_ATTACK_DURATION = 120
 USER_ACCESS_FILE = "user_access.txt"
 ATTACK_LOG_FILE = "attack_log.txt"
 OWNER_ID = "6442837812"
