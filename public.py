@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 MAX_ATTACK_DURATION = 120
 USER_ACCESS_FILE = "user_access.txt"
 ATTACK_LOG_FILE = "attack_log.txt"
-OWNER_ID = "6442837812"
+OWNER_ID = "945650098"
 bot = telebot.TeleBot('8018452264:AAEGFJekVzKvP-vnowxCry8zYBWfQCJfSFY')
 
 # ----------------------
@@ -227,8 +227,9 @@ def start_command(message):
 
     🚀 Use `/help` to see the available commands and get started!
     
+    🛡️ For assistance, contact [@its_darinda]
     🛡️ For assistance, contact [@wtf_vai]
-
+    
     **Note:** Unauthorized access is prohibited. Contact an admin if you need access.
     """
     bot.reply_to(message, welcome_message, parse_mode='Markdown')
