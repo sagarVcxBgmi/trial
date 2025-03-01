@@ -227,7 +227,6 @@ def start_command(message):
 
     🚀 Use `/help` to see the available commands and get started!
     
-    🛡️ For assistance, contact [@its_darinda]
     🛡️ For assistance, contact [@wtf_vai]
     
     **Note:** Unauthorized access is prohibited. Contact an admin if you need access.
