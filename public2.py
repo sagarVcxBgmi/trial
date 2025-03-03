@@ -16,7 +16,7 @@ import threading
 logging.basicConfig(level=logging.INFO)
 
 # Constants
-MAX_ATTACK_DURATION = 120
+MAX_ATTACK_DURATION = 240
 USER_ACCESS_FILE = "user_access.txt"
 ATTACK_LOG_FILE = "attack_log.txt"
 OWNER_ID = "6442837812"
@@ -233,8 +233,9 @@ def start_command(message):
 
     🚀 Use `/help` to see the available commands and get started!
     
-    🛡️ For assistance, contact [@wtf_vai]
-    🛡️ For assistance, contact [@its_darinda]
+    🛡️ For assistance, contact 
+            ~ [@skyline_offficail]
+        owner~ [@wtf_vai] 
     
     **Note:** Unauthorized access is prohibited. Contact an admin if you need access.
     """
