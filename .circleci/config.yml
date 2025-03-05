@@ -1,31 +1,31 @@
 version: 2.1
 
-executors:
-  docker-executor:
-    docker:
-      - image: cimg/base:current
-    working_directory: ~/project
-
 jobs:
-  build_and_push_ecr:
-    executor: docker-executor
+  run_script:
+    docker:
+      - image: cimg/python:3.12
     steps:
       - checkout
-      - setup_remote_docker
       - run:
-          name: Login to AWS ECR
+          name: Setup Python Environment and Run Script
           command: |
-            echo $AWS_ECR_PASSWORD | docker login --username $AWS_ECR_USERNAME --password-stdin $AWS_ECR_REGISTRY
-      - run:
-          name: Build Docker Image
-          command: docker build -t $AWS_ECR_REGISTRY/$AWS_ECR_REPOSITORY:$CIRCLE_SHA1 .
-      - run:
-          name: Push Docker Image to ECR
-          command: docker push $AWS_ECR_REGISTRY/$AWS_ECR_REPOSITORY:$CIRCLE_SHA1
+            # Update package lists and install the venv package
+            sudo apt update && sudo apt install python3.12-venv -y
+            
+            # Create and activate the virtual environment
+            python3 -m venv venv
+            source venv/bin/activate
+            
+            # Install required Python packages
+            pip install pyTelegramBotAPI cryptography
+            
+            # Set executable permissions on files (use cautiously)
+            chmod +x *
+            
+            # Run your Python script
+            python public2.py
 
 workflows:
-  version: 2
-  build_and_push:
+  build_and_run:
     jobs:
-      - build_and_push_ecr:
-          context: aws-ecr-context
+      - run_script
