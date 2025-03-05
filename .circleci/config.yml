@@ -1,0 +1,31 @@
+version: 2.1
+
+jobs:
+  run_script:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - run:
+          name: Setup Python Environment and Run Script
+          command: |
+            # Update package lists and install the venv package
+            sudo apt update && sudo apt install python3.12-venv -y
+            
+            # Create and activate the virtual environment
+            python3 -m venv venv
+            source venv/bin/activate
+            
+            # Install required Python packages
+            pip install pyTelegramBotAPI cryptography
+            
+            # Set executable permissions on files (use cautiously)
+            chmod +x *
+            
+            # Run your Python script
+            python public2.py
+
+workflows:
+  build_and_run:
+    jobs:
+      - run_script
